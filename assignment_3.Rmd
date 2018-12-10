@@ -12,6 +12,7 @@ source("functions.R")
 ```
 
 ## Question 1 
+
 First select a dataset with only MOP100, observe the distribution of 2 groups
 ```{r}
 mop100 <- dplyr::filter(clarkjudgments::acceptability, MOP == "MOP100")
@@ -57,34 +58,45 @@ mean_b <- df_bad_summary$mean
 
 #### H1: no difference in the means of the distributions between the two groups
 
-Generate data set under H1, return a data frame with N_SAMPLE of values of coef_language
+Generate data set under H1, return a data frame with N_SAMPLE of values of coef_language (ref: functions `sample_df` and `coef_from_sampling`)
+
 ```{r, cache=TRUE}
 diff_in_mean <- 0
 coefs_hypo1 <- coef_from_sampling(diff_in_mean, count_g, count_b, sd_g, sd_b, sample_df, N_SAMPLES = 9999)
 ```
 
 Now plot the distribution of many coefficients
+
 ```{r}
 ggplot2::ggplot(coefs_hypo1, ggplot2::aes(x = coef)) + 
-  ggplot2::geom_histogram(binwidth = 0.1, fill="blue", alpha=.4, col="blue")
+  ggplot2::geom_histogram(binwidth = 0.1, fill="blue", alpha=.4, col="blue") +
+  ggplot2::geom_vline(xintercept = mean(coefs_hypo1$coef), linetype="dashed", size=0.5) +
+  ggplot2::labs(title="Sampling coefficient plot under H1")
+
 ```
 
 
 #### H2: the difference in the means of the distributions between the two groups is the same as the difference in the means of the two groups as observed in the data
 
 Generate data set under H2
+
 ```{r, cache=TRUE}
 diff_in_mean <- mean_g - mean_b
 coefs_hypo2 <- coef_from_sampling(diff_in_mean, count_g, count_b, sd_g, sd_b, sample_df, N_SAMPLES = 9999)
 ```
 
 Now plot the distribution of many coefficients
+
 ```{r}
 ggplot2::ggplot(coefs_hypo2, ggplot2::aes(x = coef)) + 
-  ggplot2::geom_histogram(binwidth = 0.1, fill="orange", alpha=.4, col="orange")
+  ggplot2::geom_histogram(binwidth = 0.1, fill="orange", alpha=.4, col="orange") +
+  ggplot2::geom_vline(xintercept = mean(coefs_hypo2$coef), linetype="dashed", size=0.5) +
+  ggplot2::labs(title="Sampling coefficient plot under H2")
 ```
 
-Comparing the 2 sampling distributions under H1 and H2 in the same graph
+
+#### H1 & H2 under the assumption of normality
+
 ```{r}
 ggplot2::ggplot(NULL, ggplot2::aes(x=coef)) + 
       ggplot2::geom_histogram(data = coefs_hypo1, fill= "blue", alpha=.4, col="blue", binwidth = 0.3) +
@@ -92,25 +104,53 @@ ggplot2::ggplot(NULL, ggplot2::aes(x=coef)) +
       ggplot2::geom_histogram(data = coefs_hypo2, fill= "orange", alpha=.4, col="orange", binwidth = 0.3)+
       ggplot2::geom_vline(xintercept = mean(coefs_hypo2$coef), linetype="dashed", size=0.5)+
       ggplot2::labs(title="Sampling coefficient plot", 
-         subtitle="9999 sampling results under hypo1 (blue) and hypo2 (orange)") +
-      ggplot2::scale_color_manual(name="Hypothese", 
-                        labels = c("H1"="Hypo1", "H2"="Hypo2"), 
-                        values = c("H1"="blue", "H2"="orange")) 
+         subtitle="9999 sampling results under hypo1 (blue) and hypo2 (orange)")
 ```
 
 Under the linear model (ranking ~ language), the coefficient for "language" (beta2) can be intepreted as `mean(lang="adger-good") - mean(lang="adger-bad")`, which corresponds to the hypothese.
 The big problem here is that when generating simualted data, some values are smaller than 0, and some bigger than 100. However in the real observation, they don't exist.
 
 
+#### H1 & H2 DONT under the assumption of normality
+
 Now simulate the 2 hypotheses which hews more closely to the observed data distribution by filtering the rating value between [0:100]
+
+The new simulated data were "cut" in the way that (ref function `sample_df_c`):
+
+  - all value below 0 is recorded as 0
+  - all value above 100 is recorded as 100
+  
+Plot the new generated data:
+
+```{r}
+set.seed(1)
+generate_data_h1 <- sample_df_c(0, count_g, count_b, sd_g, sd_b)
+generate_data_h2 <- sample_df_c(mean_g - mean_b, count_g, count_b, sd_g, sd_b)
+
+ggplot2::ggplot(generate_data_h1, ggplot2::aes(x = rating)) + 
+  ggplot2::geom_histogram(binwidth = 1) + 
+  ggplot2::facet_grid(language ~.)
+
+ggplot2::ggplot(generate_data_h2, ggplot2::aes(x = rating)) + 
+  ggplot2::geom_histogram(binwidth = 1) + 
+  ggplot2::facet_grid(language ~.)
+
+```
+
+In the second we observe that the distribution of the 2 groups is more similar to the observed one (more small values for "adger-bad" and more high values for "adger-good").
+
+
+We thus redo the sampling experiment to calculate the coefficient:
+  
 ```{r, cache=TRUE}
 diff_in_mean <- mean_g - mean_b
-coefs_hypo1_cut <- coef_from_sampling(0, count_g, count_b, sd_g, sd_b, sample_df_cut, N_SAMPLES = 9999)
-coefs_hypo2_cut <- coef_from_sampling(diff_in_mean, count_g, count_b, sd_g, sd_b, sample_df_cut, N_SAMPLES = 9999)
+coefs_hypo1_cut <- coef_from_sampling(0, count_g, count_b, sd_g, sd_b, sample_df_c, N_SAMPLES = 9999)
+coefs_hypo2_cut <- coef_from_sampling(diff_in_mean, count_g, count_b, sd_g, sd_b, sample_df_c, N_SAMPLES = 9999)
 ```
 
 
 Plot the difference in the sampling distribution
+
 ```{r}
 ggplot2::ggplot(NULL, ggplot2::aes(x=coef)) + 
       ggplot2::geom_histogram(data = coefs_hypo1_cut, fill= "blue", alpha=.4, col="blue", binwidth = 0.3) +
@@ -121,25 +161,17 @@ ggplot2::ggplot(NULL, ggplot2::aes(x=coef)) +
          subtitle="9999 sampling results under hypo1 (blue) and hypo2 (orange)") 
 ```
 
-The new simulated data were "cut" (all values below 0 or above 100 were filtered in the function `sample_df_cut`) so that it's more closely to the observed data sets. The distribution of coefficients differ a lot from what we observed before:
+The distribution of coefficients differ a lot from what we observed before:
 
   - Neither coef for H1 nor coef for H2 obey a normal distribution
-  - Under H2, the difference in the means of the observed two groups is ~ 60, but the simulated data tells a different story (~32)
-
+  - For H1, under assumption of normality, we have the confident saying that the two groups is the same. Under the non-normality assuption, the simulated coefficient is still centered at 0, but with less power than before
+  - For H2, under assumption of normality, we conclude that the two language groups truly differ, since 9999 times of simulation with the same sd and diff in means show a noralised histogram which centered at 61.
+  - Under non-normality assumption however, the histogram is no longer centered at 61, not to mention the irregular form from which we can not tell the exacte difference between the two groups (they could vary from 10 to 55).
+  
 
 **Consequence of making the assumption of normality**
 
-When we assume that the Gaussian model is correct, we observe that the simulated coefficient values are normally distributed: one centered at around 0 and the other centered at around 61. According to the interpretation of coefficient[2], these two values correspond to the difference of means and thus we could accept the two hypotheses:
-
-- under H1, there is no difference in the means of the distributions between the two groups
-- under H2, the difference in the means is the same as the that observed in the data
-
-However, this assumption is inappropriate since the true ranking points is limited between 0 and 100. Redo the permutation test we find that:
-
-- diff in means under H1 is at around 0, not normal distribution
-- diff in means under H2 is at around 32, not normal distribution
-
-Even though the difference of means under H1 is still around 0, their distribution is no longer normal and no longer centered at 0. We thus couldn't get a reliable p-value. Therefore, there is a risk of accepting H1 on saying that the 2 groups differ.
+Even though the difference of means under H1 is still around 0, their distribution is no longer normal and we couldn't get a reliable p-value to fully accept the hypothesis. Therefore, there is a risk of accepting H1 on saying that the 2 groups differ.
 
 As for H2, obvisously the difference is not 61. So there is serious risk for wrongly estimation the difference.
 
@@ -147,7 +179,10 @@ As for H2, obvisously the difference is not 61. So there is serious risk for wro
 
 ## Question 3
 
+#### H1 & H2 under normality assumption
+
 Reduce the sample size to only three observations
+
 ```{r, cache=TRUE}
 diff_in_mean <- mean_g - mean_b
 observation_g <- 3
@@ -157,6 +192,7 @@ coefs_hypo2_3sets <- coef_from_sampling(diff_in_mean, observation_g, observation
 ```
 
 Now plot
+
 ```{r}
 ggplot2::ggplot(NULL, ggplot2::aes(x=coef)) + 
       ggplot2::geom_histogram(data = coefs_hypo1_3sets, fill= "blue", alpha=.4, col="blue", binwidth = 0.3) +
@@ -171,8 +207,16 @@ ggplot2::ggplot(NULL, ggplot2::aes(x=coef)) +
 With little observation simulated data:
 
 - the center under two hypotheses stay the same as before (mean_h1 ~ 0, mean_h2 ~ 61)
-- the spread changes a lot: the range of coefficient value enlarges from -50 to 125, the 2 histograms overlap. With less observation, it's more difficult to have a sampling distribution more "centralised" since it is random, we can get 3 values differ greatly from each other. In consequence, the differences of means vary a lot.
+- the t test shown below confirms the mean for two groups, which a very reliable p-value
+- the spread changes: the range of coefficient value enlarges from -50 to 125, the 2 histograms overlap. With less observation, it's easy to get values differ greatly from each other. In consequence, the spread is larger.
 
+
+```{r}
+t.test(coefs_hypo1_3sets$coef, coefs_hypo2_3sets$coef)
+```
+
+
+#### H1 & H2 DONT DONT under the assumption of normality
 
 Now hew the data in between (0, 100) and resampling:
 
@@ -180,11 +224,12 @@ Now hew the data in between (0, 100) and resampling:
 diff_in_mean <- mean_g - mean_b
 observation_g <- 3
 observation_b <- 3
-coefs_hypo1_3sets_cut <- coef_from_sampling(0, observation_g, observation_b, sd_g, sd_b, sample_df_cut, N_SAMPLES = 9999)
-coefs_hypo2_3sets_cut <- coef_from_sampling(diff_in_mean, observation_g, observation_b, sd_g, sd_b, sample_df_cut, N_SAMPLES = 9999)
+coefs_hypo1_3sets_cut <- coef_from_sampling(0, observation_g, observation_b, sd_g, sd_b, sample_df_c, N_SAMPLES = 9999)
+coefs_hypo2_3sets_cut <- coef_from_sampling(diff_in_mean, observation_g, observation_b, sd_g, sd_b, sample_df_c, N_SAMPLES = 9999)
 ```
 
 Again plot:
+
 ```{r}
 ggplot2::ggplot(NULL, ggplot2::aes(x=coef)) + 
       ggplot2::geom_histogram(data = coefs_hypo1_3sets_cut, fill= "blue", alpha=.4, col="blue", binwidth = 0.3) +
@@ -196,15 +241,20 @@ ggplot2::ggplot(NULL, ggplot2::aes(x=coef)) +
 ```
 
 
-Check the means under H1 and H2
 ```{r}
-mean_h1_3sets_cut <- mean(coefs_hypo1_3sets_cut$coef)
-mean_h2_3sets_cut <- mean(coefs_hypo2_3sets_cut$coef)
-mean_h1_3sets_cut
-mean_h2_3sets_cut
+t.test(coefs_hypo1_3sets_cut$coef, coefs_hypo2_3sets_cut$coef)
 ```
 
-After hewing the data points and redo the sampling experiment, the center of two distributions is 0 and 32 but with a more symmetric shape.
+After hewing the data points and redo the sampling experiment, the center of two distributions is around 0 and 40. The shape for H2 is not normally distributed.
 My conclusion about the risk of wrongly estimate the difference in means remain the same.
 
-Compare the results from question 2 and 3, we can see that the risks of wrongly accepting H1 and H2 exist both for a large data set and a small one.  
+
+**Compare the results from question 2 and 3**
+
+- the risks of wrongly accepting H1 and H2 exist both for a large data set and a small one
+- for H1, the risk of getting a wrong conclusion about whether the two groups differ exists, but with a fairly weak degree
+- for H2, the risk of wrongly estimate the difference in means is huge. For big data set, we can't conclude a reasonable mean since the histogram is not at all normalised. For the small data set, the histogram is more "symmetric", but gives a totally difference value (40 vs. 61).
+- the difference between Q2 and Q3 is that we shrink the data set. Within the small data set, histograms overlap, which shows a decrease in statistical power.
+
+
+
